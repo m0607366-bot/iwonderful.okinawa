@@ -93,6 +93,7 @@ async function save(f, data) {
 
 const pages = new Set(), pageQueue = [];
 const postDates = new Map(); // 記事ID → 公開日（REST の date）
+const catLinks = new Map(); // カテゴリーID → URL（カテゴリーの選択肢を静的サイトでも動かすため）
 const assets = new Set(), assetQueue = [];
 const redirects = new Map();
 const failed = [];
@@ -125,7 +126,7 @@ function scanHtml(html, base) {
 		ASSET_EXT.test(p.path) ? addAsset(p) : addPage(p);
 	}
 	// 月別アーカイブの選択肢など
-	for (const m of html.matchAll(/<option\b[^>]*\svalue=["']([^"']+)["']/gi)) addPage(internal(m[1], base));
+	for (const m of html.matchAll(/<option\b[^>]*\svalue=["']([^"']+)["']/gi)) if (/^(\/|https?:)/.test(m[1])) addPage(internal(m[1], base)); // カテゴリーの選択肢の値（数字のID）はURLではない
 	// CSS・JS・画像
 	for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
 		const tag = m[0];
@@ -176,6 +177,8 @@ function fixDates(html) {
 		.join("");
 }
 
+// wpX の高速化（mod_pagespeed）が付けた画像名「〜.jpg.pagespeed.ce.XXXX.jpg」を元の名前に戻す（その名前のファイルは今は取れないため）
+const unPagespeed = (h) => h.replace(/(\.(?:jpe?g|png|gif|webp|svg|css|js))\.pagespeed\.[a-z]{2}\.[\w-]+\.(?:jpe?g|png|gif|webp|svg|css|js)/gi, "$1");
 // 静的サイト用にHTMLを書き換える
 // 英語の表示を日本語に（[英語, 日本語]）
 const REPLACE = [
@@ -183,6 +186,9 @@ const REPLACE = [
 	["//www.iwonderful.okinawa", "//iwonderful.okinawa"],
 ];
 function rewriteHtml(html) {
+	// カテゴリーの選択肢（WordPress は ?cat=ID で探すが、静的サイトでは使えない）→ 値をカテゴリーのURLにして、選んだら移動
+	html = html.replace(/(<select\b[^>]*\bid=['"]cat['"][^>]*>)([\s\S]*?)(<\/select>)/g, (m, a, opts, c) => a + opts.replace(/value="(\d+)"/g, (mm, id) => (catLinks.get(id) ? `value="${catLinks.get(id)}"` : mm)) + c);
+	html = html.replace(/if \( dropdown\.value && parseInt\( dropdown\.value \) > 0 && dropdown instanceof HTMLSelectElement \) \{\s*dropdown\.parentElement\.submit\(\);/g, 'if ( dropdown.value && dropdown.value !== "-1" ) {\n\t\t\t\tdocument.location.href = dropdown.value;');
 	for (const re of REMOVE) html = html.replace(re, "");
 	for (const [a, b] of REPLACE) html = html.split(a).join(b);
 	html = fixDates(html);
@@ -241,6 +247,7 @@ async function doPage(p) {
 		failed.push(`${p} (${r.type})`);
 		return;
 	}
+	r.body = unPagespeed(r.body);
 	scanHtml(r.body, BASE + p);
 	collectBlocks(r.body);
 	await save(f, rewriteHtml(r.body));
@@ -287,7 +294,7 @@ console.log("WordPressのページ一覧を取得しています…");
 	}
 }
 const postsForSearch = [];
-for (const [route, fields] of [["/wp/v2/posts", SEARCH === "local" ? "id,link,date,title,excerpt,content" : "id,link,date"], ["/wp/v2/pages", "id,link,date"], ["/wp/v2/categories", "link"], ["/wp/v2/tags", "link"]]) {
+for (const [route, fields] of [["/wp/v2/posts", SEARCH === "local" ? "id,link,date,title,excerpt,content" : "id,link,date"], ["/wp/v2/pages", "id,link,date"], ["/wp/v2/categories", "id,link"], ["/wp/v2/tags", "link"]]) {
 	for (let page = 1; ; page++) {
 		const r = await get(`${BASE}/?rest_route=${route}&per_page=100&page=${page}&_fields=${fields}`);
 		let list = [];
@@ -296,6 +303,7 @@ for (const [route, fields] of [["/wp/v2/posts", SEARCH === "local" ? "id,link,da
 		} catch {}
 		if (!Array.isArray(list) || list.length === 0) break;
 		for (const x of list) addPage(internal(x.link, BASE));
+		if (route === "/wp/v2/categories") for (const x of list) if (x.id) catLinks.set(String(x.id), internal(x.link, BASE)?.path);
 		for (const x of list) if (x.id && x.date && /posts|pages/.test(route)) postDates.set(String(x.id), x.date);
 		if (route === "/wp/v2/posts" && SEARCH === "local") postsForSearch.push(...list);
 		if (list.length < 100) break;
@@ -354,6 +362,7 @@ if ([...assets].some((a) => a.startsWith(EL + "/"))) {
 
 // 存在しないページ（404）の見た目もWordPressと同じに
 const nf = await get(BASE + "/this-page-does-not-exist-404/");
+if (nf.body) nf.body = unPagespeed(nf.body);
 if (nf.body) {
 	scanHtml(nf.body, BASE + "/");
 	await save(path.join(OUT, "404.html"), rewriteHtml(nf.body));
