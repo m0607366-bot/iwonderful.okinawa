@@ -1,0 +1,9 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	// www.iwonderful.okinawa に来た人を iwonderful.okinawa の同じページへ転送するだけのもの
+	"name": "www-iwonderful-okinawa",
+	"main": "index.js",
+	"compatibility_date": "2026-02-24",
+	"workers_dev": false,
+	"routes": [{ "pattern": "www.iwonderful.okinawa", "custom_domain": true }]
+}

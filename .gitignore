@@ -1,0 +1,7 @@
+node_modules
+.wrangler
+.DS_Store
+# WordPressから写したファイル（画像・CSSなど）。scripts/mirror.mjs で作り直せる
+/site/wp-content
+/site/wp-includes
+_to_delete

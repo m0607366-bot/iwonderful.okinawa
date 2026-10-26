@@ -1,0 +1,15 @@
+{
+  "name": "iwonderful",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fetch": "node scripts/mirror.mjs",
+    "preview": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:www": "wrangler deploy -c www/wrangler.jsonc"
+  },
+  "devDependencies": {
+    "wrangler": "^4.150.0"
+  }
+}
