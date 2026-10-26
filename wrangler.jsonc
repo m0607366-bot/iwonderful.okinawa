@@ -2,9 +2,9 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "iwonderful-okinawa",
 	"compatibility_date": "2026-02-24",
-	// 本番ドメイン（Cloudflareのカスタムドメイン）は切り替えのときに下の1行のコメント（//）を外す。仮のアドレス（workers.dev）も残す
+	// 本番ドメイン（Cloudflareのカスタムドメイン）。仮のアドレス（workers.dev）も残す
 	"workers_dev": true,
-	// "routes": [{ "pattern": "iwonderful.okinawa", "custom_domain": true }],
+	"routes": [{ "pattern": "iwonderful.okinawa", "custom_domain": true }],
 	// WordPressの表示をそのまま写した静的ファイルだけのサイト
 	"assets": {
 		"directory": "./site",
